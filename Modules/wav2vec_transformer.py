@@ -129,7 +129,7 @@ class TransformerBlockW(nn.Module):
         out = self.dropout(self.norm2(forward + x))
         return out
 
-
+"""
 # Parameters (To be adjusted to the output of the encoder block)
 batch_size = 16
 seq_length = 49 # In the paper the output of the encoder block has a frequency of 49Hz, we are assuming that each input is a 1s input 
@@ -157,3 +157,4 @@ contextualized_reps = transformer_block(masked_reps, masked_reps, masked_reps, N
 
 # Output dimensions
 print("Contextualized Representations Shape:", contextualized_reps.shape)
+"""
