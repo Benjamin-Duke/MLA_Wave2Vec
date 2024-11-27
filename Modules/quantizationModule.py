@@ -18,7 +18,7 @@ class QuantizationModule(nn.Module):
     - forward(z): Performs quantization using the codebooks 
       and returns the quantized output after a linear transformation.
     """
-    def __init__(self, num_codebooks=2, num_codes=320, code_dim=128, output_dim=256, temperature=1.0):
+    def __init__(self, num_codebooks, num_codes, code_dim=256, output_dim=256, temperature=1.0):
         super(QuantizationModule, self).__init__()
         self.num_codebooks = num_codebooks
         self.num_codes = num_codes
@@ -44,7 +44,9 @@ class QuantizationModule(nn.Module):
         Returns:
         - Tensor: Quantized tensor of shape (batch_size, sequence_length, output_dim)
         """
-        z = z.view(z.shape[0], z.shape[1], self.num_codebooks, self.code_dim)
+
+        print("la",self.num_codebooks, self.code_dim)
+        z = z.view(z.shape[0], z.shape[1], 2, 256)
         
         # Compute logits and add Gumbel noise
         logits = torch.einsum('btsd,gvd->btsg', z, self.codebooks)
