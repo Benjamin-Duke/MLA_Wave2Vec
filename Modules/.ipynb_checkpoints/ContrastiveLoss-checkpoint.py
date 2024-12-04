@@ -7,16 +7,37 @@ class LossW2V:
         self.temperature = temperature
 
     def contrastive_loss(self, context_repr, quantized_repr, mask_indices):
+        
+        #context_repr = context_repr.unsqueeze(2)  # [batch_size, seq_len, 1, feature_dim ]
+
+        #print("[batch_size, seq_len, 1, feature_dim ] ? input context_repr shape : ", context_repr.shape)
 
         cos_sim = F.cosine_similarity(context_repr, quantized_repr, dim=-1)  # [ batch_size, seq_len, K+1 ]
+
+        #print("[cos_sim ", cos_sim.shape)
+
         cos_sim_scaled = cos_sim / self.temperature
+        logits = cos_sim_scaled 
+        probabilities = F.softmax(logits, dim=-1)
 
-        mask_indices 
+        probabilities = probabilities.unsqueeze(-1)
         
+        #target = mask_indices  # [batch_size, seq_len]
+        target = mask_indices.long()
+
+        #print("[DEBUG] mask_indices shape:", mask_indices.shape)
 
 
-        
-        #loss = -torch.sum(target_one_hot * torch.log(probabilities + 1e-8))  # [batch_size, seq_len]
+
+        #target = mask_indices[:, :, 0]  # Par exemple, choisissez la première dimension ou une autre
+
+        # Ensuite, vous pouvez appliquer F.one_hot
+        target_one_hot = F.one_hot(target, num_classes=self.K+1)  #  [batch_size, seq_len, K+1]
+
+        #print("[DEBUG] target_one_hot shape:", target_one_hot.shape)
+        #print("[DEBUG] probabilities shape:", probabilities.shape)
+
+        loss = -torch.sum(target_one_hot * torch.log(probabilities + 1e-8))  # [batch_size, seq_len]
         
         return torch.mean(loss) #MEAN Batched loss 
 
