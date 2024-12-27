@@ -3,65 +3,53 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class QuantizationModule(nn.Module):
-    """
-    Quantization module based on Gumbel-Softmax for discretizing 
-    continuous representations while remaining differentiable.
-
-    Arguments:
-    - num_codebooks (int): Number of codebooks (groups of codes).
-    - num_codes (int): Number of code vectors per codebook.
-    - code_dim (int): Dimension of the code vectors.
-    - output_dim (int): Dimension of the output after linear transformation.
-    - temperature (float): Temperature to control the discretization.
-
-    Method:
-    - forward(z): Performs quantization using the codebooks 
-      and returns the quantized output after a linear transformation.
-    """
-    def __init__(self, num_codebooks, num_codes, code_dim=256, output_dim=256, temperature=1.0):
-        super(QuantizationModule, self).__init__()
+    def __init__(self, input_dim, codebook_size, num_codebooks, output_dim, temperature=1.0):
+        super().__init__()
+        self.input_dim = input_dim
+        self.codebook_size = codebook_size
         self.num_codebooks = num_codebooks
-        self.num_codes = num_codes
-        self.code_dim = code_dim
         self.temperature = temperature
         
-        # Initialize the codebooks
-        self.codebooks = nn.Parameter(torch.randn(num_codebooks, num_codes, code_dim))
+        # Dimension de chaque codebook
+        self.codebook_dim = input_dim // num_codebooks
         
-        # Final linear transformation to achieve the desired output dimension
-        self.linear = nn.Linear(num_codebooks * code_dim, output_dim)
+        # Projection vers les logits (ajustée pour la dimension de séquence)
+        self.logits_projection = nn.Linear(self.codebook_dim, codebook_size)
+        
+        # Codebooks
+        self.codebooks = nn.Parameter(torch.randn(num_codebooks, codebook_size, self.codebook_dim))
+        
+        # Projection finale
+        self.output_projection = nn.Linear(input_dim, output_dim)
 
     def forward(self, z):
-        """
-        Performs the forward pass of the quantizer. Takes an input tensor `z`,
-        computes the logits between `z` and the codebooks, applies Gumbel noise,
-        then selects codes using differentiable softmax. Finally, the output
-        is projected into the output dimension using a linear transformation.
-
-        Arguments:
-        - z (Tensor): Input tensor of shape (batch_size, sequence_length, num_codebooks * code_dim)
-
-        Returns:
-        - Tensor: Quantized tensor of shape (batch_size, sequence_length, output_dim)
-        """
-
-        #print("la",self.num_codebooks, self.code_dim)
-   #     z = z.view(z.shape[0], z.shape[1], 2, 256)
-        z = z.view(z.shape[0], z.shape[1], self.num_codebooks, self.code_dim)
-
-#        z = z.view(16, 1501, self.num_codebooks, -1)
+        batch_size, seq_length, _ = z.shape
         
-        # Compute logits and add Gumbel noise
-        logits = torch.einsum('btsd,gvd->btsg', z, self.codebooks)
-        gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits) + 1e-9) + 1e-9)
-        logits = (logits + gumbel_noise) / self.temperature
+        # Reshape pour traiter chaque groupe séparément
+        z = z.reshape(batch_size, seq_length, self.num_codebooks, self.codebook_dim)
         
-        # Differentiable selection of codes using Gumbel-Softmax
-        softmax_weights = F.softmax(logits, dim=-1)
-        quantized = torch.einsum('btsg,gvd->btsd', softmax_weights, self.codebooks)
-        quantized = quantized.view(z.shape[0], z.shape[1], -1)
+        # Calculer les logits pour chaque groupe
+        logits = self.logits_projection(z)  # [batch, seq, num_codebooks, codebook_size]
         
-        # Final linear transformation to the output dimension
-        quantized = self.linear(quantized)
+        if self.training:
+            # Gumbel noise
+            uniform_noise = torch.rand_like(logits)
+            gumbel_noise = -torch.log(-torch.log(uniform_noise + 1e-10) + 1e-10)
+            logits = (logits + gumbel_noise) / self.temperature
         
-        return quantized
+        # Softmax sur les logits
+        probs = F.softmax(logits, dim=-1)
+        
+        # Straight-through estimator
+        indices = torch.argmax(probs, dim=-1)
+        hard_probs = F.one_hot(indices, self.codebook_size).float()
+        quantized = hard_probs - probs.detach() + probs
+        
+        # Sélection des entrées du codebook
+        quantized = torch.einsum('bsgv,gvd->bsgd', quantized, self.codebooks)
+        
+        # Reshape et projection finale
+        quantized = quantized.reshape(batch_size, seq_length, -1)
+        output = self.output_projection(quantized)
+        
+        return output
