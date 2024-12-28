@@ -1,67 +1,56 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.cluster import KMeans
+
+class STEQuantization(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, z, codebook):
+        batch_size, num_tokens, feature_dim = z.shape
+        V, _ = codebook.shape  # V is the number of codebook entries
+        Wq = codebook.t()  
+        logits = torch.matmul(z, Wq)  # Project z to logits using Wq
+        ctx.save_for_backward(z, logits, codebook)
+        return logits
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # STE principle
+        z, logits, codebook = ctx.saved_tensors
+        grad_z = torch.matmul(grad_output, codebook)  # Gradient w.r.t. z (Shape: (batch_size, num_tokens, feature_dim))
+        return grad_z, None
+
 
 class QuantizationModule(nn.Module):
-    """
-    Quantization module based on Gumbel-Softmax for discretizing 
-    continuous representations while remaining differentiable.
-
-    Arguments:
-    - num_codebooks (int): Number of codebooks (groups of codes).
-    - num_codes (int): Number of code vectors per codebook.
-    - code_dim (int): Dimension of the code vectors.
-    - output_dim (int): Dimension of the output after linear transformation.
-    - temperature (float): Temperature to control the discretization.
-
-    Method:
-    - forward(z): Performs quantization using the codebooks 
-      and returns the quantized output after a linear transformation.
-    """
-    def __init__(self, num_codebooks, num_codes, code_dim=256, output_dim=256, temperature=1.0):
-        super(QuantizationModule, self).__init__()
-        self.num_codebooks = num_codebooks
-        self.num_codes = num_codes
-        self.code_dim = code_dim
+    def __init__(self, input_dim, codebook_size, num_codebooks, output_dim, temperature=1.0):
+        super().__init__()
+        
+        self.model_input_dimension = input_dim  # Dimension de sortie du feature encoder
+        self.codebook_size = codebook_size  # Nombre de clusters du codebook
+        self.num_codebooks = num_codebooks  # Nombre de codebooks
         self.temperature = temperature
         
-        # Initialize the codebooks
-        self.codebooks = nn.Parameter(torch.randn(num_codebooks, num_codes, code_dim))
+        # Dimension de chaque codebook
+        self.codebook_dim = input_dim // num_codebooks
         
-        # Final linear transformation to achieve the desired output dimension
-        self.linear = nn.Linear(num_codebooks * code_dim, output_dim)
+        # Projection finale
+        self.W_p = nn.Parameter(torch.randn(self.codebook_size, self.model_input_dimension))
 
-    def forward(self, z):
-        """
-        Performs the forward pass of the quantizer. Takes an input tensor `z`,
-        computes the logits between `z` and the codebooks, applies Gumbel noise,
-        then selects codes using differentiable softmax. Finally, the output
-        is projected into the output dimension using a linear transformation.
+    def forward(self, z): 
+        batch_size, num_tokens, feature_dim = z.shape  # Ex: 8,49,512
+        z_flat = z.view(batch_size * num_tokens, feature_dim)
 
-        Arguments:
-        - z (Tensor): Input tensor of shape (batch_size, sequence_length, num_codebooks * code_dim)
+        kmeans = KMeans(n_clusters=self.codebook_size, random_state=42).fit(z_flat.cpu().detach().numpy())  # Clustering K-means
+        codebook = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32, requires_grad=True).to(z.device)
 
-        Returns:
-        - Tensor: Quantized tensor of shape (batch_size, sequence_length, output_dim)
-        """
+        # Application du STE 
+        logits = STEQuantization.apply(z, codebook)
 
-        #print("la",self.num_codebooks, self.code_dim)
-   #     z = z.view(z.shape[0], z.shape[1], 2, 256)
-        z = z.view(z.shape[0], z.shape[1], self.num_codebooks, self.code_dim)
+        one_hot_vect = F.gumbel_softmax(logits, tau=1.0, hard=True)
 
-#        z = z.view(16, 1501, self.num_codebooks, -1)
-        
-        # Compute logits and add Gumbel noise
-        logits = torch.einsum('btsd,gvd->btsg', z, self.codebooks)
-        gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits) + 1e-9) + 1e-9)
-        logits = (logits + gumbel_noise) / self.temperature
-        
-        # Differentiable selection of codes using Gumbel-Softmax
-        softmax_weights = F.softmax(logits, dim=-1)
-        quantized = torch.einsum('btsg,gvd->btsd', softmax_weights, self.codebooks)
-        quantized = quantized.view(z.shape[0], z.shape[1], -1)
-        
-        # Final linear transformation to the output dimension
-        quantized = self.linear(quantized)
-        
-        return quantized
+        quantized_output = torch.matmul(one_hot_vect, self.W_p)  # Shape: (batch_size, num_tokens, output_dim)
+
+        avg_softmax_probs = one_hot_vect.mean(dim=0)  # Moyenne sur le batch et les tokens (forme: [num_codebooks, V])
+        diversity_loss = -torch.sum(avg_softmax_probs * torch.log(avg_softmax_probs + 1e-10), dim=-1).mean()
+
+        return quantized_output, diversity_loss
