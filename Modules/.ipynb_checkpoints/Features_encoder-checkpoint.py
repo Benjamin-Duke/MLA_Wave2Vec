@@ -18,36 +18,36 @@ class FeatureEncoder(nn.Module):
         super(FeatureEncoder, self).__init__()
 
         # Définition explicite des couches convolutionnelles
-        self.conv1 = nn.Conv1d(input_channels, 512, kernel_size=10, stride=5, padding=5)
+        self.conv1 = nn.Conv1d(1, 512, kernel_size=10, stride=5, padding=0)
         self.norm1 = nn.LayerNorm([512])  # Normalisation sur les canaux
         self.gelu1 = nn.GELU()
 
-        self.conv2 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=1)
+        self.conv2 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=0)
         self.norm2 = nn.LayerNorm([512])
         self.gelu2 = nn.GELU()
 
-        self.conv3 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=1)
+        self.conv3 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=0)
         self.norm3 = nn.LayerNorm([512])
         self.gelu3 = nn.GELU()
 
-        self.conv4 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=1)
+        self.conv4 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=0)
         self.norm4 = nn.LayerNorm([512])
         self.gelu4 = nn.GELU()
 
-        self.conv5 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=1)
+        self.conv5 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=0)
         self.norm5 = nn.LayerNorm([512])
         self.gelu5 = nn.GELU()
 
-        self.conv6 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=1)
+        self.conv6 = nn.Conv1d(512, 512, kernel_size=3, stride=2, padding=0)
         self.norm6 = nn.LayerNorm([512])
         self.gelu6 = nn.GELU()
 
-        self.conv7 = nn.Conv1d(512, feature_dim, kernel_size=2, stride=2, padding=1)
-        self.norm7 = nn.LayerNorm([feature_dim])
+        self.conv7 = nn.Conv1d(512, feature_dim, kernel_size=2, stride=2, padding=0)
+        self.norm7 = nn.LayerNorm([512])
         self.gelu7 = nn.GELU()
 
         # Convolution pour l'encoding positionnel relatif
-        #self.positional_encoding = nn.Conv1d(512, 512, kernel_size=128, groups=16, padding=64)
+        self.positional_encoding = nn.Conv1d(512, 512, kernel_size=128, groups=16, padding=0)
 
     def forward(self, x):
         """
@@ -65,8 +65,8 @@ class FeatureEncoder(nn.Module):
         x = self.norm1(x)       # Normalisation
         x = self.gelu1(x)       # Activation GELU
 
-
-        #print(x.shape)
+    
+      #  print("1",x.shape)
         
         # Deuxième couche : Convolution -> Permute -> Normalisation -> GELU
         x = self.conv2(x.permute(0, 2, 1))  # Vous devez permuter avant d'appliquer conv2
@@ -74,7 +74,7 @@ class FeatureEncoder(nn.Module):
         x = self.norm2(x)
         x = self.gelu2(x)
 
-       # print(x.shape)
+       # print("2",x.shape)
         
         #print(x.shape)
         # Troisième couche : Convolution -> Permute -> Normalisation -> GELU
@@ -83,7 +83,7 @@ class FeatureEncoder(nn.Module):
         x = self.norm3(x)
         x = self.gelu3(x)
 
-      #  print(x.shape)
+       # print("3",x.shape)
 
         # Quatrième couche : Convolution -> Permute -> Normalisation -> GELU
         x = self.conv4(x.permute(0, 2, 1))
@@ -92,7 +92,7 @@ class FeatureEncoder(nn.Module):
         x = self.gelu4(x)
 
 
-        #print(x.shape)
+       # print("4",x.shape)
 
         
         # Cinquième couche : Convolution -> Permute -> Normalisation -> GELU
@@ -102,7 +102,7 @@ class FeatureEncoder(nn.Module):
         x = self.gelu5(x)
         #print(x.shape)
 
-     #   print(x.shape)
+       # print("5",x.shape)
 
         # Sixième couche : Convolution -> Permute -> Normalisation -> GELU
         x = self.conv6(x.permute(0, 2, 1))
@@ -110,7 +110,7 @@ class FeatureEncoder(nn.Module):
         x = self.norm6(x)
         x = self.gelu6(x)
 
-       # print(x.shape)
+       # print("6",x.shape)
 
         # Septième couche : Convolution -> Permute -> Normalisation -> GELU
         x = self.conv7(x.permute(0, 2, 1))
@@ -119,11 +119,12 @@ class FeatureEncoder(nn.Module):
         x = self.gelu7(x)
 
 
-      #  print("End", x.shape)
+       # print("7", x.shape)
         # Ajout des embeddings positionnels relatifs
-        #x = self.positional_encoding(x)
+        #x = self.positional_encoding(x.permute(0, 2, 1))
+        #x = x.permute(0, 2, 1)
 
-        #print(x.shape)
+        #print("pos embde feature encoder :", x.shape)
         
         return x
 
