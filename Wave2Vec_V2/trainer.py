@@ -10,6 +10,10 @@ import os
 from datetime import datetime
 import json
 
+from wave2vec import Wav2Vec2
+from dataLibriSpeech import LibriSpeech
+from Modules.config import Wav2Vec2Config
+
 class WarmupLinearSchedule(optim.lr_scheduler._LRScheduler):
     def __init__(self, optimizer, warmup_steps, total_steps, last_epoch=-1):
         self.warmup_steps = warmup_steps
@@ -256,7 +260,7 @@ class Trainer:
                 
                 try:
                     # Forward pass with masking enabled (same as training)
-                    c, q, mask_indices = self.model(audio, mask=True)
+                    c, q, mask_indices = self.model(audio, maskBool=True)
                     
                     # Compute loss
                     loss = self.model.compute_loss(c, q, mask_indices)

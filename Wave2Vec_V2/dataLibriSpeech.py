@@ -25,4 +25,14 @@ class LibriSpeech(torch.utils.data.Dataset):
         elif audio_length > self.target_length:
             audio = audio[:self.target_length]
         audio = torch.tensor(audio, dtype=torch.float32)
+        audio = (audio - audio.mean()) / audio.std()
+        
         return audio, text
+
+if __name__ == "__main__":
+    dataset = LibriSpeech(split="test-clean", target_length=480000, device='cpu')
+    audio, text = dataset[8]
+    
+    mean = audio.mean().item()
+    std = audio.std().item()
+    print(f"Mean: {mean}, Std Dev: {std}")
