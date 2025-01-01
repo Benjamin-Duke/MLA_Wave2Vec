@@ -136,118 +136,137 @@ class Wav2Vec2(nn.Module):
         
         return c, q, mask_indices
         
-    def compute_loss(self, c, q, mask_indices):
-        """Compute contrastive loss with configurations from config"""
+    def compute_loss(self, c, q, mask_indices, num_negatives=100, temperature=0.1, eps=1e-7):
+        """
+        Compute contrastive loss:
+        L_m = -log(exp(sim(c_t, q_t)/κ) / sum_k(exp(sim(c_t, q_k)/κ)))
+        where:
+        - c_t is the context network output at masked position t
+        - q_t is the correct quantized representation at position t
+        - q_k are the distractors (including q_t)
+        - κ is the temperature (set to 0.1)
+        - sim(a,b) is the cosine similarity between a and b
+        """
+        # Check if we have any masked indices
         if mask_indices.sum() == 0:
             return torch.tensor(0.0, device=c.device, requires_grad=True)
-        
+
+        # Get masked indices in flattened form
         flat_mask = mask_indices.view(-1)
         masked_indices = torch.nonzero(flat_mask).squeeze(-1)
-        
-        if len(masked_indices) == 0:
+
+        if len(masked_indices) == 0:  # No masked positions
             return torch.tensor(0.0, device=c.device, requires_grad=True)
-        
-        # Get positive samples
-        c_masked = c.view(-1, c.size(-1))[masked_indices]
-        q_masked = q.view(-1, q.size(-1))[masked_indices]
-        
-        # Sample negative indices
+
+        # Get positive samples (c_t and q_t pairs)
+        c_masked = c.view(-1, c.size(-1))[masked_indices]  # c_t
+        q_masked = q.view(-1, q.size(-1))[masked_indices]  # q_t
+
+        # Sample negative indices for each positive
         with torch.no_grad():
-            neg_indices = self._sample_negatives(
-                masked_indices, 
-                len(flat_mask), 
-                self.config.num_negatives
-            )
-            negatives = q.view(-1, q.size(-1))[neg_indices]
-        
-        # Compute cosine similarity
-        eps = 1e-7
+            neg_indices = self._sample_negatives(masked_indices, len(flat_mask), num_negatives)
+            negatives = q.view(-1, q.size(-1))[neg_indices]  # q_k distractors
+
+        # Compute cosine similarity with numerical stability
         c_masked = F.normalize(c_masked + eps, dim=-1)
         q_masked = F.normalize(q_masked + eps, dim=-1)
         negatives = F.normalize(negatives + eps, dim=-1)
-        
-        # Compute logits
-        pos_logits = torch.sum(c_masked * q_masked, dim=-1, keepdim=True)
-        neg_logits = torch.bmm(
-            c_masked.unsqueeze(1), 
-            negatives.transpose(1, 2)
-        ).squeeze(1)
-        
-        logits = torch.cat([pos_logits, neg_logits], dim=1)
-        logits = logits / self.config.contrastive_temperature
-        
+
+        # Compute sim(c_t, q_t) for positives
+        pos_logits = torch.sum(c_masked * q_masked, dim=-1, keepdim=True)  # [num_masked, 1]
+
+        # Compute sim(c_t, q_k) for negatives
+        neg_logits = torch.bmm(c_masked.unsqueeze(1), negatives.transpose(1, 2)).squeeze(1)  # [num_masked, num_negatives]
+
+        # Concatenate positive and negative logits
+        logits = torch.cat([pos_logits, neg_logits], dim=1)  # [num_masked, 1 + num_negatives]
+
+        # Scale by temperature κ
+        logits = logits / temperature
+
+        # Targets are zeros (positive pair should be selected)
         targets = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
-        
-        # Compute losses
+
+        # Compute contrastive loss using cross entropy (equivalent to -log(exp(pos)/sum(exp(all))))
         contrastive_loss = F.cross_entropy(logits, targets)
-        
+
+        # Compute diversity loss (weight α = 0.1 as per paper)
         try:
             prob_perplexity = self.compute_prob_perplexity()
-            diversity_loss = -torch.log(prob_perplexity + eps) * self.config.diversity_weight
+            diversity_loss = -torch.log(prob_perplexity + eps) * 0.1  # α = 0.1
             diversity_loss = torch.clamp(diversity_loss, min=-10, max=10)
         except Exception as e:
             print(f"Warning: Error computing diversity loss: {e}")
             diversity_loss = torch.tensor(0.0, device=c.device, requires_grad=True)
-        
-        return contrastive_loss + diversity_loss
+
+        # Total loss
+        loss = contrastive_loss + diversity_loss
+
+        # # Print loss components only if they're valid
+        # if self.training and not torch.isnan(loss) and not torch.isinf(loss):
+        #     print(f"\nLoss components:")
+        #     print(f"Contrastive loss: {contrastive_loss.item():.4f}")
+        #     print(f"Diversity loss: {diversity_loss.item():.4f}")
+        #     print(f"Total loss: {loss.item():.4f}")
+        #     print(f"Prob perplexity: {prob_perplexity.item():.2f}")
+        #     print(f"Number of masked positions: {len(masked_indices)}")
+        #     print(f"Average positive logit: {pos_logits.mean().item():.4f}")
+        #     print(f"Average negative logit: {neg_logits.mean().item():.4f}")
+
+        return loss
 
     def compute_prob_perplexity(self, eps=1e-7):
-        """Compute codebook perplexity"""
+        """
+        Compute the perplexity of the averaged softmax probability over codebook entries
+        This helps ensure even usage of the codebook vectors
+        """
+        # Get the weight matrix from the quantizer projection
         logits = self.quantizer.weight_proj.weight
-        
+
+        # Reshape to (num_codebooks, codebook_size, -1)
         logits = logits.view(
             self.config.num_codebooks,
             self.config.codebook_size,
             -1
         )
-        
+
+        # Compute softmax probabilities with numerical stability
         logits = torch.clamp(logits, min=-100, max=100)
-        probs = F.softmax(logits, dim=1)
-        
+        probs = F.softmax(logits, dim=1)  # Along codebook dimension
+
+        # Average over feature dimension
         avg_probs = probs.mean(dim=-1)
+
+        # Add small epsilon to avoid log(0)
         avg_probs = avg_probs + eps
-        
+
+        # Compute perplexity for each group
         perplexities = []
         for g in range(self.config.num_codebooks):
             p = avg_probs[g]
+            # Normalize probabilities to sum to 1
             p = p / p.sum()
             perplexity = torch.exp(-torch.sum(p * torch.log(p)))
             perplexities.append(perplexity)
-        
-        return torch.stack(perplexities).mean()
-        
+
+        # Average perplexity across groups
+        avg_perplexity = torch.stack(perplexities).mean()
+
+        return avg_perplexity
+
     def _sample_negatives(self, pos_indices, num_masked, num_negatives):
-        """Sample negative indices from other masked positions"""
+        """Sample negative indices from other masked positions."""
         with torch.no_grad():
+            # Create a range of all masked indices
             all_indices = torch.arange(num_masked, device=pos_indices.device)
-            
+
+            # For each positive, sample K distractors from other masked positions
             neg_indices = []
             for i in range(len(pos_indices)):
+                # Exclude the current positive index
                 valid_indices = torch.cat([all_indices[:i], all_indices[i+1:]])
+                # Sample K indices
                 sampled = valid_indices[torch.randperm(len(valid_indices))[:num_negatives]]
                 neg_indices.append(sampled)
-            
+
             return torch.stack(neg_indices)
-
-# if __name__ == "__main__":
-#     # Initialize model
-#     try:
-#         config = Wav2Vec2Config()
-#         model = Wav2Vec2(config)
-#         print("Model initialized successfully.")
-#     except Exception as e:
-#         print("Error during model initialization:", e)
-#         exit(1)
-
-#     # Generate dummy input
-#     batch_size = 32
-#     seq_length = 48000  # Input sequence length
-#     input_tensor = torch.randn(batch_size, seq_length)
-
-#     # Test forward pass
-#     try:
-#         c, q, mask_indices = model(input_tensor)
-#         print("Forward pass works!")
-#         print(f"c.shape: {c.shape}, q.shape: {q.shape}, mask_indices.shape: {mask_indices.shape}")
-#     except Exception as e:
-#         print("Error during forward pass:", e)
