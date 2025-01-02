@@ -14,6 +14,10 @@ from wave2vec import Wav2Vec2
 from dataLibriSpeech import LibriSpeech
 from Modules.config import Wav2Vec2Config
 
+import torch
+from torch.utils.tensorboard import SummaryWriter
+
+
 class WarmupLinearSchedule(optim.lr_scheduler._LRScheduler):
     def __init__(self, optimizer, warmup_steps, total_steps, last_epoch=-1):
         self.warmup_steps = warmup_steps
@@ -21,14 +25,16 @@ class WarmupLinearSchedule(optim.lr_scheduler._LRScheduler):
         super(WarmupLinearSchedule, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
-        step = self.last_epoch
+        step = self.last_epoch + 1  # Add +1 because last_epoch starts at -1
         if step < self.warmup_steps:
             # Linear warmup
-            return [base_lr * step / self.warmup_steps for base_lr in self.base_lrs]
+            scale = step / max(1, self.warmup_steps)
+            return [base_lr * scale for base_lr in self.base_lrs]
         else:
             # Linear decay
-            return [base_lr * (self.total_steps - step) / (self.total_steps - self.warmup_steps)
-                   for base_lr in self.base_lrs]
+            progress = (step - self.warmup_steps) / max(1, (self.total_steps - self.warmup_steps))
+            scale = max(0.0, 1.0 - progress)
+            return [base_lr * scale for base_lr in self.base_lrs]
 
 class Trainer:
     def __init__(
@@ -101,7 +107,7 @@ class Trainer:
         self.optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
         
         # Setup learning rate scheduler
-        total_steps = 400000 if config.d_model == 768 else 250000  # BASE vs LARGE
+        total_steps = 400000 
         warmup_steps = int(0.08 * total_steps)  # 8% warmup
         self.scheduler = WarmupLinearSchedule(
             self.optimizer,
@@ -197,7 +203,10 @@ class Trainer:
                     print(f"Context output shape: {c.shape}")
                     print(f"Quantized output shape: {q.shape}")
                     print(f"Mask indices shape: {mask_indices.shape}")
+                    print(f"Actual masking ratio: {mask_indices.float().mean().item():.4f}")
+                    print(f"Number of masked positions per batch: {mask_indices.sum(dim=1).tolist()}")
                     print(f"Number of masked positions: {mask_indices.sum().item()}")
+                    
                 
                 # Compute loss
                 loss = self.model.compute_loss(c, q, mask_indices)
@@ -207,11 +216,11 @@ class Trainer:
                 
                 # Add L2 regularization for Librispeech
                 if self.l2_regularization:
-                    l2_loss = 0.0
+                    l2_loss = torch.tensor(0.0, device=self.device)
                     for name, param in self.model.feature_encoder.named_parameters():
                         if 'weight' in name:
-                            l2_loss += torch.norm(param)
-                    loss += 0.01 * l2_loss
+                            l2_loss = l2_loss + torch.norm(param)
+                    loss = loss + 0.01 * l2_loss
                     
                     if batch_idx == 0:
                         print(f"L2 loss: {l2_loss.item():.4f}")
@@ -224,7 +233,8 @@ class Trainer:
                 # Scale gradients for feature encoder if using Librispeech
                 if self.is_librispeech:
                     for param in self.model.feature_encoder.parameters():
-                        param.grad *= self.encoder_grad_scale
+                        if param.grad is not None:
+                            param.grad = param.grad * self.encoder_grad_scale
                 
                 # Clip gradients
                 grad_norm = clip_grad_norm_(self.model.parameters(), max_norm=5.0)
@@ -237,7 +247,10 @@ class Trainer:
                 # Track learning rate
                 self.learning_rates.append(self.scheduler.get_last_lr()[0])
                 
-                total_loss += loss.item()
+                total_loss = total_loss + loss.item()
+
+                if batch_idx == 0:
+                    print(f"Learning rate actuel : {self.scheduler.get_last_lr()[0]}")
                 
                 # Print batch statistics (only first few batches)
                 if batch_idx < 5:
@@ -267,13 +280,13 @@ class Trainer:
                     
                     # Add L2 regularization if using Librispeech (same as training)
                     if self.l2_regularization:
-                        l2_loss = 0.0
+                        l2_loss = torch.tensor(0.0, device=self.device)
                         for name, param in self.model.feature_encoder.named_parameters():
                             if 'weight' in name:
-                                l2_loss += torch.norm(param)
-                        loss += 0.01 * l2_loss
+                                l2_loss = l2_loss + torch.norm(param)
+                        loss = loss + 0.01 * l2_loss
                     
-                    total_loss += loss.item()
+                    total_loss = total_loss + loss.item()
                     
                     # Print validation statistics (only first batch)
                     if batch_idx == 0:
@@ -289,16 +302,21 @@ class Trainer:
         return total_loss / len(self.val_loader)
         
     def train(self, num_epochs):
+        writer = SummaryWriter()
         for epoch in range(self.current_epoch, num_epochs):
             print(f"\nEpoch {epoch + 1}/{num_epochs}")
             
             # Training
             train_loss = self.train_epoch()
             self.train_losses.append(train_loss)
+
+            writer.add_scalar("Loss/train",train_loss,epoch)
             
             # Validation
             val_loss = self.validate()
             self.val_losses.append(val_loss)
+
+            writer.add_scalar("Loss/val",val_loss,epoch)
             
             print(f"\nEpoch {epoch + 1} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
             
@@ -323,3 +341,6 @@ class Trainer:
                 break
             
             self.current_epoch = epoch + 1
+            
+        writer.flush()
+        writer.close()

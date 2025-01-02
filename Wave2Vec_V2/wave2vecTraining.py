@@ -7,6 +7,11 @@ from wave2vec import Wav2Vec2
 from Modules.config import Wav2Vec2Config
 from trainer import Trainer
 
+import torch
+from torch.utils.tensorboard import SummaryWriter
+
+
+
 # Set device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
@@ -40,7 +45,7 @@ if torch.cuda.device_count() > 1:
 print(f"Model parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
 
 # Create checkpoint directory
-checkpoint_dir = "checkpoints"
+checkpoint_dir = "checkpoints_test"
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 # Load checkpoint if it exists

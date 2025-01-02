@@ -12,18 +12,31 @@ class Mask(nn.Module):
     def forward(self, x):
         B, T, C = x.shape
         
-        # Calculate how many starting indices to sample
-        num_mask = int(T * self.mask_prob)
-        
-        # Sample starting indices
-        mask_starts = torch.randperm(T)[:num_mask]
+        # Calculate the total number of masks needed
+        # We want mask_prob percentage of the total sequence to be masked
+        total_masked_length = int(T * self.mask_prob)
+        # Calculate how many mask segments we need
+        num_masks = math.ceil(total_masked_length / self.mask_length)
         
         # Create mask tensor
         mask = torch.zeros(B, T, dtype=torch.bool, device=x.device)
         
-        # For each starting index, mask the subsequent M time steps
-        for start in mask_starts:
-            end = min(start + self.mask_length, T)
-            mask[:, start:end] = True
-            
+        # For each batch
+        for batch_i in range(B):
+            # Calculate valid starting positions (ensure we don't go out of bounds)
+            valid_starts = T - self.mask_length + 1
+            if valid_starts <= 0:
+                continue
+                
+            # Sample starting indices without replacement
+            if num_masks < valid_starts:
+                starts = torch.randperm(valid_starts, device=x.device)[:num_masks]
+            else:
+                starts = torch.randperm(valid_starts, device=x.device)
+                
+            # Apply masks
+            for start in starts:
+                end = min(start + self.mask_length, T)
+                mask[batch_i, start:end] = True
+                
         return mask

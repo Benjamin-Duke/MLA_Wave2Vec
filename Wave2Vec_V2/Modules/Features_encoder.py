@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 class FeatureEncoder(nn.Module):
-    def __init__(self, conv_layers=[(512, 10, 5)] + [(512, 3, 2)] * 5 + [(512, 2, 2)]):
+    def __init__(self, conv_layers=[(512, 10, 5)] + [(512, 3, 2)] * 4 + [(512, 2, 2)*2]):
         super().__init__()
         
         layers = []

@@ -23,7 +23,7 @@ class Wav2Vec2Config:
     temp_decay: float = 0.999995
     
     # Masking
-    mask_prob: float = 0.065
+    mask_prob: float = 0.5
     mask_length: int = 10
     
     # Training
