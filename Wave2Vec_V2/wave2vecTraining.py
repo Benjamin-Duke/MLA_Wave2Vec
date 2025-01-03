@@ -45,7 +45,7 @@ if torch.cuda.device_count() > 1:
 print(f"Model parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
 
 # Create checkpoint directory
-checkpoint_dir = "checkpoints_test"
+checkpoint_dir = "checkpoints_test_1"
 os.makedirs(checkpoint_dir, exist_ok=True)
 
 # Load checkpoint if it exists

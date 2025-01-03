@@ -107,7 +107,7 @@ class Trainer:
         self.optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
         
         # Setup learning rate scheduler
-        total_steps = 400000 
+        total_steps = 37500 
         warmup_steps = int(0.08 * total_steps)  # 8% warmup
         self.scheduler = WarmupLinearSchedule(
             self.optimizer,
@@ -209,10 +209,12 @@ class Trainer:
                     
                 
                 # Compute loss
-                loss = self.model.compute_loss(c, q, mask_indices)
+                loss, contrastive_loss, diversity_loss = self.model.compute_loss(c, q, mask_indices)
                 
                 if batch_idx == 0:
                     print(f"Initial loss: {loss.item():.4f}")
+                    print(f"Initial contrastive loss: {contrastive_loss.item():.4f}")
+                    print(f"Initial diversity loss: {diversity_loss.item():.4f}")
                 
                 # Add L2 regularization for Librispeech
                 if self.l2_regularization:
@@ -276,7 +278,7 @@ class Trainer:
                     c, q, mask_indices = self.model(audio, maskBool=True)
                     
                     # Compute loss
-                    loss = self.model.compute_loss(c, q, mask_indices)
+                    loss,_,_ = self.model.compute_loss(c, q, mask_indices)
                     
                     # Add L2 regularization if using Librispeech (same as training)
                     if self.l2_regularization:

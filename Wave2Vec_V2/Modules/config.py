@@ -5,7 +5,7 @@ class Wav2Vec2Config:
     #Config BASE model
     
     # Feature encoder
-    conv_layers: list = field(default_factory=lambda: [(512, 10, 5)] + [(512, 3, 2)] * 5 + [(512, 2, 2)])
+    conv_layers: list = field(default_factory=lambda: [(512, 10, 5)] + [(512, 3, 2)] * 4 + [(512, 2, 2)]*2)
     dropout: float = 0.1
     layer_drop: float = 0.05
     

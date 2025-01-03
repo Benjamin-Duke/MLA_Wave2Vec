@@ -192,9 +192,7 @@ class Wav2Vec2(nn.Module):
 
         # Compute diversity loss (weight α = 0.1 as per paper)
         try:
-            prob_perplexity = self.compute_prob_perplexity()
-            diversity_loss = -torch.log(prob_perplexity + eps) * 0.1  # α = 0.1
-            diversity_loss = torch.clamp(diversity_loss, min=-10, max=10)
+            diversity_loss = self.calculate_diversity_loss(q)*0.1
         except Exception as e:
             print(f"Warning: Error computing diversity loss: {e}")
             diversity_loss = torch.tensor(0.0, device=c.device, requires_grad=True)
@@ -203,57 +201,25 @@ class Wav2Vec2(nn.Module):
         loss = contrastive_loss + diversity_loss
 
         # # Print loss components only if they're valid
-        # if self.training and not torch.isnan(loss) and not torch.isinf(loss):
+        if self.training and not torch.isnan(loss) and not torch.isinf(loss):
         #     print(f"\nLoss components:")
-        #     print(f"Contrastive loss: {contrastive_loss.item():.4f}")
-        #     print(f"Diversity loss: {diversity_loss.item():.4f}")
+             # print(f"Contrastive loss: {contrastive_loss.item():.4f}")
+             # print(f"Diversity loss: {diversity_loss.item():.4f}")
         #     print(f"Total loss: {loss.item():.4f}")
         #     print(f"Prob perplexity: {prob_perplexity.item():.2f}")
         #     print(f"Number of masked positions: {len(masked_indices)}")
         #     print(f"Average positive logit: {pos_logits.mean().item():.4f}")
         #     print(f"Average negative logit: {neg_logits.mean().item():.4f}")
 
-        return loss
+        return loss, contrastive_loss, diversity_loss
 
-    def compute_prob_perplexity(self, eps=1e-7):
-        """
-        Compute the perplexity of the averaged softmax probability over codebook entries
-        This helps ensure even usage of the codebook vectors
-        """
-        # Get the weight matrix from the quantizer projection
-        logits = self.quantizer.weight_proj.weight
+    def calculate_diversity_loss(self, qt):
+        B, G, V = qt.shape
+        softmax_probs = F.softmax(qt, dim=-1)
+        entropy = -torch.sum(softmax_probs * torch.log(softmax_probs + 1e-10), dim=-1)
+        return entropy.mean()
 
-        # Reshape to (num_codebooks, codebook_size, -1)
-        logits = logits.view(
-            self.config.num_codebooks,
-            self.config.codebook_size,
-            -1
-        )
-
-        # Compute softmax probabilities with numerical stability
-        logits = torch.clamp(logits, min=-100, max=100)
-        probs = F.softmax(logits, dim=1)  # Along codebook dimension
-
-        # Average over feature dimension
-        avg_probs = probs.mean(dim=-1)
-
-        # Add small epsilon to avoid log(0)
-        avg_probs = avg_probs + eps
-
-        # Compute perplexity for each group
-        perplexities = []
-        for g in range(self.config.num_codebooks):
-            p = avg_probs[g]
-            # Normalize probabilities to sum to 1
-            p = p / p.sum()
-            perplexity = torch.exp(-torch.sum(p * torch.log(p)))
-            perplexities.append(perplexity)
-
-        # Average perplexity across groups
-        avg_perplexity = torch.stack(perplexities).mean()
-
-        return avg_perplexity
-
+    
     def _sample_negatives(self, pos_indices, num_masked, num_negatives):
         """Sample negative indices from other masked positions."""
         with torch.no_grad():
