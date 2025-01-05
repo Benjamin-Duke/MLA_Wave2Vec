@@ -23,12 +23,19 @@ pip install -r requirements.txt
 ```bash
 python3 wave2vecTraining.py
 ```
-### 3. Fine-Tuning et Evaluation
+### 3. Fine-Tuning
 - Lancer la commande suivante
 ```bash
-python3 fineTunerAndEval.py
+python3 fineTuningModel.py
+```
+### 4. Evaluation
+- Lancer la commande suivante
+```bash
+python3 evalModel.py
 ```
 
 ## Références
 - [wav2vec 2.0: A Framework for Self-Supervised Learning of Speech Representations](https://arxiv.org/pdf/2006.11477)
 - [An Illustrated Tour of Wav2vec 2.0](https://jonathanbgn.com/2021/09/30/illustrated-wav2vec-2.html)
+- [Bert : Pre-training of deep bidirectional transformers for language understanding](https://arxiv.org/pdf/1810.04805)
+- [Attention is all you need](https://arxiv.org/pdf/1706.03762)
