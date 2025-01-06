@@ -1,5 +1,7 @@
 # Projet MLA G14 : Wav2Vec
 
+Juste à lancer run_finetuning.py
+
 L'objectif du projet est de reproduire l'architecture et les expérimentations misent en place dans l'article *wav2vec 2.0: A Framework for Self-Supervised Learning of Speech Representations*.
 - Utilisation de la dataset Librispeech
 - Architecture adapaté à nos contraintes
