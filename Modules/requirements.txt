@@ -1,9 +1,0 @@
-scikit-learn
-pytorch-lightning
-numpy
-matplotlib
-seaborn
-torchaudio
-speechbrain
-
-
