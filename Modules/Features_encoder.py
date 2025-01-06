@@ -1,4 +1,8 @@
 
+"""27/12/2024 Versions
+   Author: Guillaume
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,18 +10,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-import torch
-import torch.nn as nn
-
 class FeatureEncoder(nn.Module):
-    """
-    Encodeur de caractéristiques audio avec des convolutions, normalisation et GELU.
-    Transforme les formes d'onde brutes en représentations compactes.
-    """
     def __init__(self, input_channels=1, feature_dim=512):
         super(FeatureEncoder, self).__init__()
 
         # Définition explicite des couches convolutionnelles
+<<<<<<< Updated upstream
         self.conv1 = nn.Conv1d(input_channels, 512, kernel_size=10, stride=5, padding=5)
         self.norm1 = nn.LayerNorm([512])  # Normalisation sur les canaux
         self.gelu1 = nn.GELU()
@@ -48,20 +46,22 @@ class FeatureEncoder(nn.Module):
 
         # Convolution pour l'encoding positionnel relatif
         #self.positional_encoding = nn.Conv1d(512, 512, kernel_size=128, groups=16, padding=64)
+=======
+        self.conv1 = nn.Conv1d(input_channels, feature_dim, kernel_size=10, stride=5)
+        self.conv2 = nn.Conv1d(feature_dim, feature_dim, kernel_size=3, stride=2)
+        self.conv3 = nn.Conv1d(feature_dim, feature_dim, kernel_size=2, stride=2)
+        self.norm = nn.LayerNorm([feature_dim])  # Normalisation sur les canaux
+        self.gelu = nn.GELU()
+>>>>>>> Stashed changes
 
     def forward(self, x):
-        """
-        Passage avant de l'encodeur.
-        Args:
-            x (torch.Tensor): Formes d'onde (batch_size, 1, sequence_length)
-        Returns:
-            torch.Tensor: Représentations latentes (batch_size, feature_dim, reduced_sequence_length)
-        """
-        # Passage explicite par chaque couche sans boucle
+
+        # Passage explicite par chaque couche
 
         # Première couche : Convolution -> Permute -> Normalisation -> GELU
         x = self.conv1(x)
         x = x.permute(0, 2, 1)  # Permutation pour changer les dimensions (batch, seq_len, channels)
+<<<<<<< Updated upstream
         x = self.norm1(x)       # Normalisation
         x = self.gelu1(x)       # Activation GELU
 
@@ -75,19 +75,34 @@ class FeatureEncoder(nn.Module):
         x = self.gelu2(x)
 
        # print(x.shape)
+=======
+        x = self.norm(x)       # Normalisation
+        x = self.gelu(x)       # Activation GELU
+  
+        # Deuxième couche : Convolution -> Permute -> Normalisation -> GELU
+        x = self.conv2(x.permute(0, 2, 1))  # Vous devez permuter avant d'appliquer conv2
+        x = x.permute(0, 2, 1)  # Permuter après la convolution
+        x = self.norm(x)
+        x = self.gelu(x)
+>>>>>>> Stashed changes
         
-        #print(x.shape)
         # Troisième couche : Convolution -> Permute -> Normalisation -> GELU
-        x = self.conv3(x.permute(0, 2, 1))
+        x = self.conv2(x.permute(0, 2, 1))
         x = x.permute(0, 2, 1)
+<<<<<<< Updated upstream
         x = self.norm3(x)
         x = self.gelu3(x)
 
       #  print(x.shape)
+=======
+        x = self.norm(x)
+        x = self.gelu(x)
+>>>>>>> Stashed changes
 
         # Quatrième couche : Convolution -> Permute -> Normalisation -> GELU
-        x = self.conv4(x.permute(0, 2, 1))
+        x = self.conv2(x.permute(0, 2, 1))
         x = x.permute(0, 2, 1)
+<<<<<<< Updated upstream
         x = self.norm4(x)
         x = self.gelu4(x)
 
@@ -95,26 +110,42 @@ class FeatureEncoder(nn.Module):
         #print(x.shape)
 
         
+=======
+        x = self.norm(x)
+        x = self.gelu(x)
+ 
+>>>>>>> Stashed changes
         # Cinquième couche : Convolution -> Permute -> Normalisation -> GELU
-        x = self.conv5(x.permute(0, 2, 1))
+        x = self.conv2(x.permute(0, 2, 1))
         x = x.permute(0, 2, 1)
+<<<<<<< Updated upstream
         x = self.norm5(x)
         x = self.gelu5(x)
         #print(x.shape)
 
      #   print(x.shape)
+=======
+        x = self.norm(x)
+        x = self.gelu(x)
+>>>>>>> Stashed changes
 
         # Sixième couche : Convolution -> Permute -> Normalisation -> GELU
-        x = self.conv6(x.permute(0, 2, 1))
+        x = self.conv3(x.permute(0, 2, 1))
         x = x.permute(0, 2, 1)
+<<<<<<< Updated upstream
         x = self.norm6(x)
         x = self.gelu6(x)
 
        # print(x.shape)
+=======
+        x = self.norm(x)
+        x = self.gelu(x)
+>>>>>>> Stashed changes
 
         # Septième couche : Convolution -> Permute -> Normalisation -> GELU
-        x = self.conv7(x.permute(0, 2, 1))
+        x = self.conv3(x.permute(0, 2, 1))
         x = x.permute(0, 2, 1)
+<<<<<<< Updated upstream
         x = self.norm7(x)
         x = self.gelu7(x)
 
@@ -165,11 +196,16 @@ class FeatureEncoder(nn.Module):
     def forward(self, x):
         # x : entrée audio brut de forme (batch_size, 1, sequence_length)
         x = self.conv_layers(x)
+=======
+        x = self.norm(x)
+        x = self.gelu(x)
+>>>>>>> Stashed changes
         
         # Embedding de position relative
         pos_embed = self.positional_embedding(x)
         x = x + F.gelu(pos_embed)  # Ajout de l'embedding de position après activation GELU
         return x
+<<<<<<< Updated upstream
 
         
         """
@@ -201,3 +237,6 @@ encoder = FeatureEncoder()
 print("Dimension de la sortie encodée :", encoded_output.shape)
 
 """
+=======
+    
+>>>>>>> Stashed changes
