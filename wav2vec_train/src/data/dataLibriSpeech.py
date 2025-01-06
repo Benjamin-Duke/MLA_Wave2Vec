@@ -6,7 +6,7 @@ import torchaudio
 class LibriSpeech(torch.utils.data.Dataset):
     def __init__(self, split="test-clean", target_length=48000, device='cuda'):
         self.dataset = torchaudio.datasets.LIBRISPEECH(
-            root=os.path.expanduser("./src/data/dataset/"),
+            root=os.path.expanduser("./dataset/"),
             url=split,
             download=True,
         )
@@ -16,7 +16,7 @@ class LibriSpeech(torch.utils.data.Dataset):
         return len(self.dataset)
     def __getitem__(self, item):
         audio, samplerate, text, _, _,_  = self.dataset[item]
-        assert sample_rate == 16000
+        assert samplerate == 16000
         audio = audio.flatten().numpy()
         audio_length = len(audio)
         if audio_length < self.target_length:

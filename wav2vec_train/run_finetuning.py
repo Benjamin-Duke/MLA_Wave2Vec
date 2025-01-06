@@ -20,8 +20,8 @@ def main(args):
     
     # Create datasets
     print("\nLoading datasets...")
-    train_dataset = LibriSpeech(split="train-clean-100", target_length=48000)
-    val_dataset = LibriSpeech(split="dev-clean", target_length=48000)
+    train_dataset = LibriSpeech(split="dev-clean", target_length=48000)
+    val_dataset = LibriSpeech(split="dev-other", target_length=48000)
     
     print(f"Training dataset size: {len(train_dataset)}")
     print(f"Validation dataset size: {len(val_dataset)}")
