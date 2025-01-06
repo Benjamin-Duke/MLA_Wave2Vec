@@ -32,6 +32,13 @@ python3 fineTuningModel.py
 - Lancer la commande suivante
 ```bash
 python3 evalModel.py
+
+
+
+### 5. tensorboard
+- Lancer la commande suivante
+```bash
+tensorboard --logdir=./logs/fit --bind_all
 ```
 
 ## Références
