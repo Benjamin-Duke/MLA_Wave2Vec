@@ -6,7 +6,7 @@ import torchaudio
 class LibriSpeech(torch.utils.data.Dataset):
     def __init__(self, split="test-clean", target_length=48000, device='cuda'):
         self.dataset = torchaudio.datasets.LIBRISPEECH(
-            root=os.path.expanduser("./src/data/dataset/"),
+            root=os.path.expanduser("./dataset/"),
             url=split,
             download=True,
         )
@@ -15,7 +15,7 @@ class LibriSpeech(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.dataset)
     def __getitem__(self, item):
-        audio, samplerate, text, _, _,_  = self.dataset[item]
+        audio, sample_rate, text, _, _, _ = self.dataset[item]
         assert sample_rate == 16000
         audio = audio.flatten().numpy()
         audio_length = len(audio)
@@ -26,8 +26,5 @@ class LibriSpeech(torch.utils.data.Dataset):
             audio = audio[:self.target_length]
         audio = torch.tensor(audio, dtype=torch.float32)
         audio = (audio - audio.mean()) / audio.std()
-
-        text_indices = [ord(c) - ord('a') + 1 for c in text.lower() if 'a' <= c <= 'z'] # Dico
-        text = torch.tensor(text_indices, dtype=torch.long)
-
+        
         return audio, text

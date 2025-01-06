@@ -1,0 +1,1 @@
+Dossier ou sont stockés les logs de sauvegarde (quand on a pas accès a tensorboard)

@@ -1,0 +1,5 @@
+tasklist /fi "imagename eq python.exe"
+taskkill /PID <PID> /F
+
+
+tasklist | findstr tensorboard
