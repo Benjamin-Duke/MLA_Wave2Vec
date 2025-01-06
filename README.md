@@ -32,7 +32,7 @@ python3 fineTuningModel.py
 - Lancer la commande suivante
 ```bash
 python3 evalModel.py
-
+```
 
 
 ### 5. tensorboard
