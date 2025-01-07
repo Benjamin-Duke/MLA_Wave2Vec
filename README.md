@@ -19,21 +19,31 @@ pip install -r requirements.txt
 - [Corpus Librispeech](https://www.openslr.org/12) 
 
 ### 2. Pré-entraînement
-- Lancer la commande suivante
+- Lancer les commandes suivantes :
 ```bash
-python3 wave2vecTraining.py
+cd wave2vec_train
+python3 train_wav2vec.py
 ```
 ### 3. Fine-Tuning
-- Lancer la commande suivante
+- Lancer les commandes suivantes :
 ```bash
-python3 fineTuningModel.py
+cd wave2vec_train
+python run_finetuning.py --pretrained_path /path/to/bestmodellast.pt
+```
+- Si vous souhaitez changer les paramètres du fine tuning (les valeurs ci-dessous sont celles par défaut):
+```bash
+    --batch_size 16 \
+    --learning_rate 3e-5 \
+    --num_steps 50000 \
+    --classifier_steps 10000 \
+    --log_dir finetuning_runs \
+    --checkpoint_dir finetuning_checkpoints
 ```
 ### 4. Evaluation
 - Lancer la commande suivante
 ```bash
 python3 evalModel.py
 ```
-
 
 ### 5. tensorboard
 - Lancer la commande suivante
