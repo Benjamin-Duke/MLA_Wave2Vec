@@ -14,15 +14,17 @@ Installer librairie editdistance (pour WER)
 ```
 pip install editdistance
 ```
-D'abord :
+D'abord (Nouvelle version pour limiter l'usage de la mémoire):
 
 ```
 python train_lm.py \
     --data_dir LM_data \
-    --batch_size 16 \
+    --batch_size 8 \
     --learning_rate 1e-4 \
     --num_epochs 50 \
-    --max_length 512 \
+    --max_length 256 \
+    --chunk_size 1000000 \
+    --gradient_accumulation_steps 4 \
     --log_dir lm_runs \
     --checkpoint_dir lm_checkpoints
 ```
