@@ -1,10 +1,14 @@
 # Projet MLA G14 : Wav2Vec
 
 Il faut télécharger les données pour entraîner le LM Transformer : 
-https://www.openslr.org/11/
--> norm et vocab
-Créer un folder LM_data et mettre ces deux fichiers dedans.
-D'abord :
+https://www.openslr.org/11/\\
+-> norm et vocab\\
+Créer un folder LM_data et mettre ces deux fichiers dedans. \\
+Installer librairie editdistance (pour WER)\\
+```
+pip install editdistance
+```
+D'abord :\\
 python train_lm.py \
     --data_dir LM_data \
     --batch_size 16 \
@@ -14,7 +18,7 @@ python train_lm.py \
     --log_dir lm_runs \
     --checkpoint_dir lm_checkpoints
 
-Pour entrainer le transformer, ensuite :
+Pour entrainer le transformer, ensuite :\\
 python evaluate.py \
     --model_path /path/to/finetuned/wav2vec/model \
     --lm_path lm_checkpoints/best_model.pt \
