@@ -49,8 +49,10 @@ class TransformerLM(nn.Module):
         
         # Create attention mask if needed
         if attention_mask is not None:
-            attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-            attention_mask = (1.0 - attention_mask) * -10000.0
+            # Convert from [batch_size, seq_len] to [batch_size, seq_len]
+            # where 1 means "not masked" and 0 means "masked"
+            attention_mask = attention_mask.bool()
+            attention_mask = ~attention_mask  # Invert because transformer expects 1 for masked positions
         
         # Pass through transformer
         x = self.transformer(x, src_key_padding_mask=attention_mask)

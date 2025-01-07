@@ -4,7 +4,7 @@ from datasets import load_dataset
 import editdistance
 from tqdm import tqdm
 from Modules.wav2vec2_model import Wav2Vec2ForCTC
-from transformer_lm import TransformerLM
+from transformer_lm import TransformerLM, TransformerLMConfig
 from beam_decoder import BeamSearchDecoder, load_vocab
 
 def calculate_wer(predictions: list, references: list) -> float:
@@ -61,9 +61,9 @@ def evaluate_model(args):
     
     # Load language model
     print("Loading language model...")
-    checkpoint = torch.load(args.lm_path, map_location=device)
-    language_model = TransformerLM(checkpoint['config']).to(device)
-    language_model.load_state_dict(checkpoint['model_state_dict'])
+    config = TransformerLMConfig()  # Create default config
+    language_model = TransformerLM(config).to(device)
+    language_model.load_state_dict(torch.load(args.lm_path, map_location=device))
     language_model.eval()
     
     # Load vocabulary

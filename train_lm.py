@@ -145,14 +145,8 @@ def train_language_model(args):
         # Save best model
         if avg_val_loss < best_loss:
             best_loss = avg_val_loss
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
-                'config': config,
-                'best_loss': best_loss
-            }, os.path.join(args.checkpoint_dir, 'best_model.pt'))
+            torch.save(model.state_dict(), os.path.join(args.checkpoint_dir, 'best_model.pt'))
+            print(f"Saved new best model with validation loss: {best_loss:.4f}")
         
         # Update learning rate
         scheduler.step()
