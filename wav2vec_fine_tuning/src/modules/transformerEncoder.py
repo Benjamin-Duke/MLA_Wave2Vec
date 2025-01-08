@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+
 class MultiHeadAttention(nn.Module):
     def __init__(self, embed_size=768, num_heads=8):
         super(MultiHeadAttention, self).__init__()
@@ -33,6 +34,7 @@ class MultiHeadAttention(nn.Module):
         out = self.fc_out(out)
         return out
 
+# Transformer Block with Convolutional Positional Embedding
 class TransformerEncoderLayer(nn.Module):
     def __init__(self):
         super(TransformerEncoderLayer, self).__init__()
@@ -65,3 +67,4 @@ class TransformerEncoder(nn.Module):
         for layer in self.layers:
             x = layer(x, mask)
         return x
+    
