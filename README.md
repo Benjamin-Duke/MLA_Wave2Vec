@@ -21,13 +21,13 @@ pip install -r requirements.txt
 ### 2. Pré-entraînement
 - Lancer les commandes suivantes :
 ```bash
-cd wave2vec_train
-python3 train_wav2vec.py
+cd wave2vec_pretrain
+python train_wav2vec.py
 ```
 ### 3. Fine-Tuning
 - Lancer les commandes suivantes :
 ```bash
-cd wave2vec_train
+cd wave2vec_fine_tuning
 python run_finetuning.py --pretrained_path /path/to/bestmodellast.pt
 ```
 - Si vous souhaitez changer les paramètres du fine tuning (les valeurs ci-dessous sont celles par défaut):
@@ -40,11 +40,16 @@ python run_finetuning.py --pretrained_path /path/to/bestmodellast.pt
     --checkpoint_dir finetuning_checkpoints
 ```
 ### 4. Evaluation
-- Lancer la commande suivante
+- Pour lancer l'entrainement du décodeur
 ```bash
-python3 evalModel.py
+cd wave2vec_eval
+python script_name.py --text_file path_to_your_text_file --output_path path_to_save_model --batch_size 64 --num_epochs 10 --learning_rate 0.0003
 ```
-
+- Pour lancer l'évaluation du modèle
+```bash
+cd wave2vec_eval
+python script_name.py --model_path path_to_your_model --lm_path path_to_your_language_model --vocab_path path_to_vocabulary_file --beam_size 100 --lm_weight 0.3 --word_score -1.0 --output_file evaluation_results.txt --data_dir /path/to/librispeech/data --cache_dir /path/to/cache
+```
 ### 5. tensorboard
 - Lancer la commande suivante
 ```bash
